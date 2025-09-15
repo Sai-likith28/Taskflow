@@ -565,10 +565,13 @@ const Dashboard = () => {
 
         {/* Edit Task Dialog */}
         <Dialog open={!!editingTask} onOpenChange={() => setEditingTask(null)}>
-          <DialogContent>
+          <DialogContent aria-describedby="edit-task-description">
             <DialogHeader>
               <DialogTitle>Edit Task</DialogTitle>
             </DialogHeader>
+            <div id="edit-task-description" className="sr-only">
+              Edit the selected task's details including title, description, priority, status and due date
+            </div>
             {editingTask && (
               <TaskForm
                 task={editingTask}
