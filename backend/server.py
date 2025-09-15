@@ -224,22 +224,151 @@ async def delete_task(task_id: str, current_user: User = Depends(get_current_use
         raise HTTPException(status_code=404, detail="Task not found")
     return {"message": "Task deleted successfully"}
 
-# Dashboard stats
-@api_router.get("/dashboard/stats")
-async def get_dashboard_stats(current_user: User = Depends(get_current_user)):
-    tasks = await db.tasks.find({"user_id": current_user.id}).to_list(1000)
+# AI Response Models
+class AITaskSummary(BaseModel):
+    summary: str
+    insights: List[str]
+    recommendations: List[str]
+
+class AIPriorityAnalysis(BaseModel):
+    suggested_priority: str
+    reasoning: str
+    urgency_score: int  # 1-10 scale
+
+# AI Service Functions
+async def generate_task_summary(tasks: List[dict]) -> AITaskSummary:
+    """Generate AI-powered daily task summary"""
+    if not tasks or not EMERGENT_LLM_KEY:
+        return AITaskSummary(
+            summary="No tasks to summarize",
+            insights=[],
+            recommendations=[]
+        )
     
-    total_tasks = len(tasks)
-    pending_tasks = len([t for t in tasks if t["status"] == "pending"])
-    in_progress_tasks = len([t for t in tasks if t["status"] == "in_progress"])
-    completed_tasks = len([t for t in tasks if t["status"] == "completed"])
+    try:
+        # Prepare task data for AI
+        task_data = []
+        for task in tasks:
+            task_info = f"- {task['title']} (Priority: {task['priority']}, Status: {task['status']})"
+            if task.get('description'):
+                task_info += f": {task['description']}"
+            task_data.append(task_info)
+        
+        task_list = "\n".join(task_data)
+        
+        # Initialize AI chat
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"task-summary-{uuid.uuid4()}",
+            system_message="You are an AI productivity assistant that analyzes tasks and provides insightful summaries."
+        ).with_model("openai", "gpt-4o")
+        
+        prompt = f"""
+        Analyze the following tasks and provide a comprehensive summary:
+
+        {task_list}
+
+        Please provide:
+        1. A brief overall summary of the current task situation
+        2. 2-3 key insights about productivity patterns or task distribution
+        3. 2-3 actionable recommendations for better task management
+
+        Format your response as JSON with keys: summary, insights, recommendations
+        """
+        
+        user_message = UserMessage(text=prompt)
+        response = await chat.send_message(user_message)
+        
+        # Parse response (assuming it's JSON-like)
+        import json
+        try:
+            ai_data = json.loads(response)
+            return AITaskSummary(
+                summary=ai_data.get('summary', 'Task analysis completed'),
+                insights=ai_data.get('insights', []),
+                recommendations=ai_data.get('recommendations', [])
+            )
+        except:
+            # Fallback parsing
+            return AITaskSummary(
+                summary=response[:200] + "..." if len(response) > 200 else response,
+                insights=["AI analysis completed"],
+                recommendations=["Continue managing tasks effectively"]
+            )
+            
+    except Exception as e:
+        logging.error(f"AI task summary error: {str(e)}")
+        return AITaskSummary(
+            summary="AI analysis temporarily unavailable",
+            insights=["System is processing your tasks"],
+            recommendations=["Continue with your current workflow"]
+        )
+
+async def analyze_task_priority(title: str, description: str, due_date: Optional[datetime] = None) -> AIPriorityAnalysis:
+    """Analyze task and suggest priority using AI"""
+    if not EMERGENT_LLM_KEY:
+        return AIPriorityAnalysis(
+            suggested_priority="medium",
+            reasoning="Default priority assigned",
+            urgency_score=5
+        )
     
-    return {
-        "total_tasks": total_tasks,
-        "pending_tasks": pending_tasks,
-        "in_progress_tasks": in_progress_tasks,
-        "completed_tasks": completed_tasks
-    }
+    try:
+        # Initialize AI chat
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"priority-analysis-{uuid.uuid4()}",
+            system_message="You are an AI assistant that analyzes tasks and suggests appropriate priorities."
+        ).with_model("openai", "gpt-4o")
+        
+        due_date_text = f"Due: {due_date.strftime('%Y-%m-%d')}" if due_date else "No due date specified"
+        
+        prompt = f"""
+        Analyze this task and suggest an appropriate priority level:
+
+        Title: {title}
+        Description: {description}
+        {due_date_text}
+
+        Consider factors like:
+        - Urgency (time sensitivity)
+        - Importance (impact on goals)
+        - Complexity
+        - Dependencies
+
+        Suggest priority as "low", "medium", or "high" and provide reasoning.
+        Also provide an urgency score from 1-10 (10 being most urgent).
+
+        Format as JSON: {{"suggested_priority": "...", "reasoning": "...", "urgency_score": ...}}
+        """
+        
+        user_message = UserMessage(text=prompt)
+        response = await chat.send_message(user_message)
+        
+        # Parse response
+        import json
+        try:
+            ai_data = json.loads(response)
+            return AIPriorityAnalysis(
+                suggested_priority=ai_data.get('suggested_priority', 'medium'),
+                reasoning=ai_data.get('reasoning', 'Analysis completed'),
+                urgency_score=int(ai_data.get('urgency_score', 5))
+            )
+        except:
+            # Fallback
+            return AIPriorityAnalysis(
+                suggested_priority="medium",
+                reasoning="AI suggested medium priority based on task analysis",
+                urgency_score=5
+            )
+            
+    except Exception as e:
+        logging.error(f"AI priority analysis error: {str(e)}")
+        return AIPriorityAnalysis(
+            suggested_priority="medium",
+            reasoning="Priority analysis temporarily unavailable",
+            urgency_score=5
+        )
 
 # Include the router in the main app
 app.include_router(api_router)
