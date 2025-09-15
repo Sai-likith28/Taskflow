@@ -310,6 +310,18 @@ const TaskCard = ({ task, onEdit, onDelete }) => {
     }
   };
 
+  const handleDelete = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDelete(task.id);
+  };
+
+  const handleEdit = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onEdit(task);
+  };
+
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardContent className="p-4">
@@ -318,11 +330,21 @@ const TaskCard = ({ task, onEdit, onDelete }) => {
             {getStatusIcon(task.status)}
             <h3 className="font-semibold text-slate-800">{task.title}</h3>
           </div>
-          <div className="flex gap-1">
-            <Button size="sm" variant="ghost" onClick={() => onEdit(task)}>
+          <div className="flex gap-1" style={{ zIndex: 10 }}>
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              onClick={handleEdit}
+              style={{ pointerEvents: 'auto' }}
+            >
               <Edit className="w-4 h-4" />
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => onDelete(task.id)}>
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              onClick={handleDelete}
+              style={{ pointerEvents: 'auto' }}
+            >
               <Trash2 className="w-4 h-4" />
             </Button>
           </div>
