@@ -22,7 +22,11 @@ import {
   Edit,
   Trash2,
   BarChart3,
-  User
+  User,
+  Brain,
+  Sparkles,
+  Lightbulb,
+  Target
 } from "lucide-react";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
