@@ -370,8 +370,49 @@ async def analyze_task_priority(title: str, description: str, due_date: Optional
             urgency_score=5
         )
 
-# Include the router in the main app
-app.include_router(api_router)
+# Dashboard stats
+@api_router.get("/dashboard/stats")
+async def get_dashboard_stats(current_user: User = Depends(get_current_user)):
+    tasks = await db.tasks.find({"user_id": current_user.id}).to_list(1000)
+    
+    total_tasks = len(tasks)
+    pending_tasks = len([t for t in tasks if t["status"] == "pending"])
+    in_progress_tasks = len([t for t in tasks if t["status"] == "in_progress"])
+    completed_tasks = len([t for t in tasks if t["status"] == "completed"])
+    
+    return {
+        "total_tasks": total_tasks,
+        "pending_tasks": pending_tasks,
+        "in_progress_tasks": in_progress_tasks,
+        "completed_tasks": completed_tasks
+    }
+
+# AI-powered endpoints
+@api_router.get("/ai/task-summary", response_model=AITaskSummary)
+async def get_ai_task_summary(current_user: User = Depends(get_current_user)):
+    """Get AI-powered daily task summary"""
+    tasks = await db.tasks.find({"user_id": current_user.id}).to_list(1000)
+    summary = await generate_task_summary(tasks)
+    return summary
+
+@api_router.post("/ai/analyze-priority", response_model=AIPriorityAnalysis)
+async def analyze_task_priority_endpoint(
+    task_data: dict,
+    current_user: User = Depends(get_current_user)
+):
+    """Get AI-powered priority analysis for a task"""
+    title = task_data.get("title", "")
+    description = task_data.get("description", "")
+    due_date = None
+    
+    if task_data.get("due_date"):
+        try:
+            due_date = datetime.fromisoformat(task_data["due_date"].replace('Z', '+00:00'))
+        except:
+            pass
+    
+    analysis = await analyze_task_priority(title, description, due_date)
+    return analysis
 
 app.add_middleware(
     CORSMiddleware,
