@@ -246,9 +246,12 @@ const TaskForm = ({ task, onSave, onCancel }) => {
       <div className="grid grid-cols-2 gap-4">
         <div>
           <Label htmlFor="priority">Priority</Label>
-          <Select value={formData.priority} onValueChange={(value) => setFormData({...formData, priority: value})}>
-            <SelectTrigger>
-              <SelectValue />
+          <Select 
+            value={formData.priority} 
+            onValueChange={(value) => setFormData({...formData, priority: value})}
+          >
+            <SelectTrigger id="priority">
+              <SelectValue placeholder="Select priority" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="low">Low</SelectItem>
@@ -259,9 +262,12 @@ const TaskForm = ({ task, onSave, onCancel }) => {
         </div>
         <div>
           <Label htmlFor="status">Status</Label>
-          <Select value={formData.status} onValueChange={(value) => setFormData({...formData, status: value})}>
-            <SelectTrigger>
-              <SelectValue />
+          <Select 
+            value={formData.status} 
+            onValueChange={(value) => setFormData({...formData, status: value})}
+          >
+            <SelectTrigger id="status">
+              <SelectValue placeholder="Select status" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="pending">Pending</SelectItem>
