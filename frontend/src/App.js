@@ -540,6 +540,7 @@ const Dashboard = () => {
         {/* Tasks Section */}
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-slate-800">Your Tasks</h2>
+          {/* Create Task Dialog */}
           <Dialog open={showTaskDialog} onOpenChange={setShowTaskDialog}>
             <DialogTrigger asChild>
               <Button>
@@ -547,10 +548,13 @@ const Dashboard = () => {
                 New Task
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent aria-describedby="create-task-description">
               <DialogHeader>
                 <DialogTitle>Create New Task</DialogTitle>
               </DialogHeader>
+              <div id="create-task-description" className="sr-only">
+                Create a new task with title, description, priority, status and due date
+              </div>
               <TaskForm
                 onSave={handleCreateTask}
                 onCancel={() => setShowTaskDialog(false)}
