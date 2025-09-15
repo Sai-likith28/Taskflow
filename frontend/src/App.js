@@ -215,6 +215,8 @@ const TaskForm = ({ task, onSave, onCancel }) => {
     status: task?.status || "pending",
     due_date: task?.due_date ? task.due_date.split('T')[0] : ""
   });
+  const [aiSuggestion, setAiSuggestion] = useState(null);
+  const [loadingAI, setLoadingAI] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -223,6 +225,35 @@ const TaskForm = ({ task, onSave, onCancel }) => {
       due_date: formData.due_date ? new Date(formData.due_date).toISOString() : null
     };
     await onSave(payload);
+  };
+
+  const getAIPrioritySuggestion = async () => {
+    if (!formData.title.trim()) {
+      toast.error("Please enter a task title first");
+      return;
+    }
+
+    setLoadingAI(true);
+    try {
+      const response = await axios.post(`${API}/ai/analyze-priority`, {
+        title: formData.title,
+        description: formData.description,
+        due_date: formData.due_date ? new Date(formData.due_date).toISOString() : null
+      });
+      
+      setAiSuggestion(response.data);
+      toast.success("AI priority analysis completed!");
+    } catch (error) {
+      toast.error("AI analysis failed. Please try again.");
+    }
+    setLoadingAI(false);
+  };
+
+  const applyAISuggestion = () => {
+    if (aiSuggestion) {
+      setFormData({...formData, priority: aiSuggestion.suggested_priority});
+      toast.success("AI suggestion applied!");
+    }
   };
 
   return (
@@ -247,6 +278,62 @@ const TaskForm = ({ task, onSave, onCancel }) => {
           rows={3}
         />
       </div>
+      
+      {/* AI Priority Suggestion */}
+      <div className="bg-slate-50 p-4 rounded-lg border">
+        <div className="flex items-center justify-between mb-2">
+          <Label className="flex items-center gap-2">
+            <Brain className="w-4 h-4 text-blue-600" />
+            AI Priority Assistant
+          </Label>
+          <Button 
+            type="button" 
+            variant="outline" 
+            size="sm"
+            onClick={getAIPrioritySuggestion}
+            disabled={loadingAI}
+          >
+            {loadingAI ? (
+              <>
+                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-2"></div>
+                Analyzing...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-3 h-3 mr-2" />
+                Get AI Suggestion
+              </>
+            )}
+          </Button>
+        </div>
+        
+        {aiSuggestion && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Badge variant={
+                aiSuggestion.suggested_priority === 'high' ? 'destructive' :
+                aiSuggestion.suggested_priority === 'medium' ? 'default' : 'secondary'
+              }>
+                Suggested: {aiSuggestion.suggested_priority.toUpperCase()}
+              </Badge>
+              <span className="text-sm text-slate-600">
+                Urgency Score: {aiSuggestion.urgency_score}/10
+              </span>
+            </div>
+            <p className="text-sm text-slate-700">{aiSuggestion.reasoning}</p>
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="sm"
+              onClick={applyAISuggestion}
+            >
+              <Target className="w-3 h-3 mr-2" />
+              Apply Suggestion
+            </Button>
+          </div>
+        )}
+      </div>
+      
       <div className="grid grid-cols-2 gap-4">
         <div>
           <Label htmlFor="priority">Priority</Label>
