@@ -414,6 +414,9 @@ async def analyze_task_priority_endpoint(
     analysis = await analyze_task_priority(title, description, due_date)
     return analysis
 
+# Include the router in the main app
+app.include_router(api_router)
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
