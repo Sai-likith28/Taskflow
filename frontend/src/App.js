@@ -474,6 +474,8 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [showTaskDialog, setShowTaskDialog] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
+  const [aiSummary, setAiSummary] = useState(null);
+  const [loadingAISummary, setLoadingAISummary] = useState(false);
 
   useEffect(() => {
     fetchTasks();
@@ -497,6 +499,18 @@ const Dashboard = () => {
     } catch (error) {
       console.error("Failed to fetch stats");
     }
+  };
+
+  const fetchAISummary = async () => {
+    setLoadingAISummary(true);
+    try {
+      const response = await axios.get(`${API}/ai/task-summary`);
+      setAiSummary(response.data);
+      toast.success("AI summary generated!");
+    } catch (error) {
+      toast.error("Failed to generate AI summary");
+    }
+    setLoadingAISummary(false);
   };
 
   const handleCreateTask = async (taskData) => {
@@ -560,6 +574,10 @@ const Dashboard = () => {
             <div className="flex items-center gap-3">
               <BarChart3 className="w-8 h-8 text-slate-700" />
               <h1 className="text-xl font-bold text-slate-800">TaskFlow</h1>
+              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                <Sparkles className="w-3 h-3 mr-1" />
+                AI-Powered
+              </Badge>
             </div>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2 text-slate-600">
@@ -627,6 +645,83 @@ const Dashboard = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* AI Summary Section */}
+        {tasks.length > 0 && (
+          <Card className="mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-blue-800">
+                  <Brain className="w-5 h-5" />
+                  AI Task Summary
+                </CardTitle>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={fetchAISummary}
+                  disabled={loadingAISummary}
+                  className="border-blue-300 text-blue-700 hover:bg-blue-100"
+                >
+                  {loadingAISummary ? (
+                    <>
+                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-2"></div>
+                      Analyzing...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3 h-3 mr-2" />
+                      Generate Summary
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardHeader>
+            {aiSummary && (
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="font-medium text-slate-700 mb-2">Overview</h4>
+                    <p className="text-slate-600">{aiSummary.summary}</p>
+                  </div>
+                  
+                  {aiSummary.insights.length > 0 && (
+                    <div>
+                      <h4 className="font-medium text-slate-700 mb-2 flex items-center gap-2">
+                        <Lightbulb className="w-4 h-4" />
+                        Key Insights
+                      </h4>
+                      <ul className="space-y-1">
+                        {aiSummary.insights.map((insight, index) => (
+                          <li key={index} className="text-slate-600 flex items-start gap-2">
+                            <span className="text-blue-500 mt-1">•</span>
+                            {insight}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  
+                  {aiSummary.recommendations.length > 0 && (
+                    <div>
+                      <h4 className="font-medium text-slate-700 mb-2 flex items-center gap-2">
+                        <Target className="w-4 h-4" />
+                        Recommendations
+                      </h4>
+                      <ul className="space-y-1">
+                        {aiSummary.recommendations.map((rec, index) => (
+                          <li key={index} className="text-slate-600 flex items-start gap-2">
+                            <span className="text-green-500 mt-1">•</span>
+                            {rec}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            )}
+          </Card>
+        )}
 
         {/* Tasks Section */}
         <div className="flex justify-between items-center mb-6">
