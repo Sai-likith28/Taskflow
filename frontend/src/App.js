@@ -982,5 +982,41 @@ const AppContent = () => {
     </Routes>
   );
 };
+// --- At the very bottom of App.js ---
+
+const App = () => {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <Toaster position="top-right" richColors />
+        <Routes>
+          {/* Default route goes to Dashboard if logged in, otherwise Login */}
+          <Route 
+            path="/" 
+            element={
+              <RequireAuth>
+                <Dashboard />
+              </RequireAuth>
+            } 
+          />
+          <Route path="/login" element={<LoginForm />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
+  );
+};
+
+// A small wrapper to protect Dashboard
+const RequireAuth = ({ children }) => {
+  const { user, loading } = useAuth();
+  
+  if (loading) return <p>Loading...</p>;
+  if (!user) return <Navigate to="/login" replace />;
+  
+  return children;
+};
 
 export default App;
+
+
