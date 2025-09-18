@@ -29,11 +29,8 @@ import {
   Target,
   Calendar
 } from "lucide-react";
-const BACKEND_URL =
-  process.env.REACT_APP_BACKEND_URL ||
-  (process.env.NODE_ENV === "production"
-    ? "https://taskflow-qo7j.onrender.com"
-    : "http://127.0.0.1:8000");
+const BACKEND_URL =https://taskflow-qo7j.onrender.com;
+  
 const API = `${BACKEND_URL}/api`;
 
 // Auth context
