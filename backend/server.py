@@ -12,7 +12,30 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from passlib.context import CryptContext
 from jose import JWTError, jwt
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+# Optional AI integration. If the library isn't available, we provide a noop fallback
+try:
+    from emergentintegrations.llm.chat import LlmChat, UserMessage  # type: ignore
+    _AI_AVAILABLE = True
+except Exception:  # ImportError or any other issue should not block the API
+    _AI_AVAILABLE = False
+
+    class _NoopChat:  # minimal fallback used only when the integration is missing
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def with_model(self, *_args, **_kwargs):
+            return self
+
+        async def send_message(self, _msg):
+            return "AI integration disabled"
+
+    class _NoopUserMessage:
+        def __init__(self, text: str):
+            self.text = text
+
+    # Fallback aliases to keep the rest of the code unchanged
+    LlmChat = _NoopChat  # type: ignore
+    UserMessage = _NoopUserMessage  # type: ignore
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -306,11 +329,72 @@ async def generate_task_summary(tasks: List[dict]) -> AITaskSummary:
 
 async def analyze_task_priority(title: str, description: str, due_date: Optional[datetime] = None) -> AIPriorityAnalysis:
     """Analyze task and suggest priority using AI"""
-    if not EMERGENT_LLM_KEY:
+    if not EMERGENT_LLM_KEY or not _AI_AVAILABLE:
+        # Heuristic fallback (free): compute urgency score from due date proximity and keywords
+        score = 5
+        reasons = []
+
+        # Due date proximity
+        if due_date:
+            now = datetime.now(timezone.utc)
+            if due_date.tzinfo is None:
+                # assume UTC for naive datetimes
+                due_date = due_date.replace(tzinfo=timezone.utc)
+            delta_hours = (due_date - now).total_seconds() / 3600.0
+            if delta_hours <= 0:
+                score += 3
+                reasons.append("Past due: increase urgency")
+            elif delta_hours <= 3:
+                # Hard rule: anything within 3 hours is High
+                score = max(score, 8)
+                reasons.append("Due within 3 hours")
+            elif delta_hours <= 24:
+                score += 4
+                reasons.append("Due within 24 hours")
+            elif delta_hours <= 72:
+                score += 2
+                reasons.append("Due in 1–3 days")
+            elif delta_hours <= 168:
+                score += 1
+                reasons.append("Due this week")
+            else:
+                score -= 1
+                reasons.append("Due later than a week")
+
+        # Keywords
+        text = f"{title} {description}".lower()
+        high_words = ["urgent", "asap", "today", "now", "immediately", "critical", "deadline", "bug", "prod", "exam", "submit"]
+        med_words = ["soon", "important", "review", "prepare", "meeting", "follow up", "todo"]
+        low_words = ["optional", "someday", "later", "idea", "backlog", "nice to have"]
+        if any(w in text for w in high_words):
+            score += 3
+            reasons.append("High-urgency keywords detected")
+        if any(w in text for w in med_words):
+            score += 1
+            reasons.append("Important keywords detected")
+        if any(w in text for w in low_words):
+            score -= 2
+            reasons.append("Low-urgency keywords detected")
+
+        # Text length / complexity (very rough)
+        length = len(description.split()) if description else 0
+        if length >= 40:
+            score += 1
+            reasons.append("Longer description suggests more complexity")
+
+        # Clamp and map
+        score = max(1, min(10, int(round(score))))
+        if score >= 8:
+            priority = "high"
+        elif score >= 5:
+            priority = "medium"
+        else:
+            priority = "low"
+
         return AIPriorityAnalysis(
-            suggested_priority="medium",
-            reasoning="Default priority assigned",
-            urgency_score=5
+            suggested_priority=priority,
+            reasoning="; ".join(reasons) or "Heuristic analysis completed",
+            urgency_score=score
         )
     
     try:

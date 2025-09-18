@@ -26,7 +26,8 @@ import {
   Brain,
   Sparkles,
   Lightbulb,
-  Target
+  Target,
+  Calendar
 } from "lucide-react";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -186,7 +187,7 @@ const LoginForm = () => {
                 placeholder="Enter your password"
               />
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full h-10 bg-slate-900 text-white hover:bg-slate-800" disabled={loading}>
               {loading ? "Please wait..." : (isLogin ? "Sign In" : "Create Account")}
             </Button>
           </form>
@@ -208,21 +209,62 @@ const LoginForm = () => {
 };
 
 const TaskForm = ({ task, onSave, onCancel }) => {
+  const pad = (n) => String(n).padStart(2, '0')
+  const parseToLocalParts = (isoString) => {
+    try {
+      const d = new Date(isoString)
+      const yyyy = d.getFullYear()
+      const mm = pad(d.getMonth() + 1)
+      const dd = pad(d.getDate())
+      let hour = d.getHours()
+      const minute = pad(d.getMinutes())
+      const ampm = hour >= 12 ? 'PM' : 'AM'
+      hour = hour % 12
+      if (hour === 0) hour = 12
+      return {
+        date: `${yyyy}-${mm}-${dd}`,
+        hour: String(hour),
+        minute,
+        ampm
+      }
+    } catch {
+      return { date: '', hour: '12', minute: '00', ampm: 'AM' }
+    }
+  }
+  const initialParts = task?.due_date ? parseToLocalParts(task.due_date) : { date: '', hour: '12', minute: '00', ampm: 'AM' }
   const [formData, setFormData] = useState({
     title: task?.title || "",
     description: task?.description || "",
     priority: task?.priority || "medium",
     status: task?.status || "pending",
-    due_date: task?.due_date ? task.due_date.split('T')[0] : ""
+    due_date_date: initialParts.date,
+    due_date_hour: initialParts.hour,
+    due_date_minute: initialParts.minute,
+    due_date_ampm: initialParts.ampm,
   });
+
+  const buildDueISO = () => {
+    if (!formData.due_date_date) return null
+    let hour = parseInt(formData.due_date_hour || '12', 10)
+    const minute = parseInt(formData.due_date_minute || '0', 10)
+    if (formData.due_date_ampm === 'PM' && hour < 12) hour += 12
+    if (formData.due_date_ampm === 'AM' && hour === 12) hour = 0
+    const local = new Date(formData.due_date_date)
+    local.setHours(hour, minute, 0, 0)
+    return local.toISOString()
+  }
   const [aiSuggestion, setAiSuggestion] = useState(null);
   const [loadingAI, setLoadingAI] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const dueISO = buildDueISO()
     const payload = {
-      ...formData,
-      due_date: formData.due_date ? new Date(formData.due_date).toISOString() : null
+      title: formData.title,
+      description: formData.description,
+      priority: formData.priority,
+      status: formData.status,
+      due_date: dueISO
     };
     await onSave(payload);
   };
@@ -238,7 +280,7 @@ const TaskForm = ({ task, onSave, onCancel }) => {
       const response = await axios.post(`${API}/ai/analyze-priority`, {
         title: formData.title,
         description: formData.description,
-        due_date: formData.due_date ? new Date(formData.due_date).toISOString() : null
+        due_date: buildDueISO()
       });
       
       setAiSuggestion(response.data);
@@ -257,7 +299,7 @@ const TaskForm = ({ task, onSave, onCancel }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
       <div>
         <Label htmlFor="title">Title</Label>
         <Input
@@ -275,13 +317,14 @@ const TaskForm = ({ task, onSave, onCancel }) => {
           value={formData.description}
           onChange={(e) => setFormData({...formData, description: e.target.value})}
           placeholder="Task description"
-          rows={3}
+          rows={4}
+          className="resize-none"
         />
       </div>
       
       {/* AI Priority Suggestion */}
-      <div className="bg-slate-50 p-4 rounded-lg border">
-        <div className="flex items-center justify-between mb-2">
+      <div className="bg-slate-50 p-4 rounded-lg border border-blue-100">
+        <div className="flex items-center justify-between mb-3">
           <Label className="flex items-center gap-2">
             <Brain className="w-4 h-4 text-blue-600" />
             AI Priority Assistant
@@ -310,12 +353,15 @@ const TaskForm = ({ task, onSave, onCancel }) => {
         {aiSuggestion && (
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <Badge variant={
-                aiSuggestion.suggested_priority === 'high' ? 'destructive' :
-                aiSuggestion.suggested_priority === 'medium' ? 'default' : 'secondary'
+              <span className={
+                `px-2 py-0.5 rounded-full text-xs font-semibold ${
+                  aiSuggestion.suggested_priority === 'high' ? 'bg-red-600 text-white' :
+                  aiSuggestion.suggested_priority === 'medium' ? 'bg-blue-600 text-white' :
+                  'bg-emerald-600 text-white'
+                }`
               }>
                 Suggested: {aiSuggestion.suggested_priority.toUpperCase()}
-              </Badge>
+              </span>
               <span className="text-sm text-slate-600">
                 Urgency Score: {aiSuggestion.urgency_score}/10
               </span>
@@ -369,19 +415,55 @@ const TaskForm = ({ task, onSave, onCancel }) => {
         </div>
       </div>
       <div>
-        <Label htmlFor="due_date">Due Date</Label>
-        <Input
-          id="due_date"
-          type="date"
-          value={formData.due_date}
-          onChange={(e) => setFormData({...formData, due_date: e.target.value})}
-        />
+        <Label>Due Date & Time</Label>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="relative">
+            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+            <Input
+              type="date"
+              className="pl-9"
+              value={formData.due_date_date}
+              onChange={(e) => setFormData({...formData, due_date_date: e.target.value})}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="relative w-full">
+              <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+              <select
+                className="w-full appearance-none rounded-md border border-input bg-white pl-9 pr-3 h-10 text-sm"
+                value={formData.due_date_hour}
+                onChange={(e) => setFormData({...formData, due_date_hour: e.target.value})}
+              >
+                {Array.from({length:12},(_,i)=>i+1).map(h=> (
+                  <option key={h} value={String(h)}>{h}</option>
+                ))}
+              </select>
+            </div>
+            <select
+              className="w-full appearance-none rounded-md border border-input bg-white h-10 text-sm"
+              value={formData.due_date_minute}
+              onChange={(e) => setFormData({...formData, due_date_minute: e.target.value})}
+            >
+              {['00','05','10','15','20','25','30','35','40','45','50','55'].map(m => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+            <select
+              className="w-full appearance-none rounded-md border border-input bg-white h-10 text-sm"
+              value={formData.due_date_ampm}
+              onChange={(e) => setFormData({...formData, due_date_ampm: e.target.value})}
+            >
+              <option value="AM">AM</option>
+              <option value="PM">PM</option>
+            </select>
+          </div>
+        </div>
       </div>
-      <div className="flex gap-2">
-        <Button type="submit" className="flex-1">
+      <div className="flex gap-2 pt-2">
+        <Button type="submit" className="flex-1 h-10 bg-blue-600 text-white hover:bg-blue-700">
           {task ? "Update Task" : "Create Task"}
         </Button>
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <Button type="button" variant="outline" onClick={onCancel} className="h-10">
           Cancel
         </Button>
       </div>
@@ -452,9 +534,15 @@ const TaskCard = ({ task, onEdit, onDelete }) => {
         )}
         
         <div className="flex items-center justify-between">
-          <Badge variant={getPriorityColor(task.priority)} className="text-xs">
+          <span className={
+            `px-2 py-0.5 rounded-full text-xs font-semibold ${
+              task.priority === 'high' ? 'bg-red-600 text-white' :
+              task.priority === 'medium' ? 'bg-blue-600 text-white' :
+              'bg-emerald-600 text-white'
+            }`
+          }>
             {task.priority.toUpperCase()}
-          </Badge>
+          </span>
           
           {task.due_date && (
             <span className="text-xs text-slate-500">
@@ -729,12 +817,12 @@ const Dashboard = () => {
           {/* Create Task Dialog */}
           <Dialog open={showTaskDialog} onOpenChange={setShowTaskDialog}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="h-10 bg-blue-600 text-white hover:bg-blue-700 shadow">
                 <Plus className="w-4 h-4 mr-2" />
                 New Task
               </Button>
             </DialogTrigger>
-            <DialogContent aria-describedby="create-task-description">
+            <DialogContent aria-describedby="create-task-description" className="sm:max-w-[640px]">
               <DialogHeader>
                 <DialogTitle>Create New Task</DialogTitle>
               </DialogHeader>
