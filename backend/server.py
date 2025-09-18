@@ -11,6 +11,7 @@ from typing import List, Optional
 import uuid
 from datetime import datetime, timedelta, timezone
 from passlib.context import CryptContext
+from fastapi.middleware.cors import CORSMiddleware
 from jose import JWTError, jwt
 # Optional AI integration. If the library isn't available, we provide a noop fallback
 try:
@@ -97,7 +98,8 @@ class TaskCreate(TaskBase):
 
 class TaskUpdate(BaseModel):
     title: Optional[str] = None
-    description: Optional[str] = None
+    desc
+    ription: Optional[str] = None
     status: Optional[str] = None
     priority: Optional[str] = None
     due_date: Optional[datetime] = None
@@ -503,14 +505,13 @@ app.include_router(api_router)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=True,
     allow_origins=[
-        "https://taskflow-eight-eta.vercel.app",  
+        "https://taskflow-eight-eta.vercel.app",  # your frontend
     ],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
